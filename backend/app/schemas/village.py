@@ -1,22 +1,42 @@
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
 
 
 class VillageCreate(BaseModel):
-    name: str
-    district: str
-    state: str
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
+
+    name: str = Field(
+        min_length=2,
+        max_length=100
+    )
+
+    district: str = Field(
+        min_length=2,
+        max_length=100
+    )
+
+    state: str = Field(
+        min_length=2,
+        max_length=100
+    )
+
+    population: int | None = Field(
+        default=None,
+        ge=0
+    )
+
+    latitude: float | None = None
+
+    longitude: float | None = None
 
 
 class VillageResponse(BaseModel):
+
     id: int
     name: str
     district: str
     state: str
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
+    population: int | None
+    latitude: float | None
+    longitude: float | None
 
     class Config:
         from_attributes = True

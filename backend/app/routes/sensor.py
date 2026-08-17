@@ -1,31 +1,35 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.database import SessionLocal
-from app.models.sensor import SensorReading
-from app.schemas.sensor import SensorReading as SensorReadingSchema
+from app.database import get_db
+from app.models.sensor_reading import SensorReading
+from app.schemas.sensor import (
+    SensorReadingCreate,
+    SensorReadingResponse
+)
+from app.routes.auth import get_current_user
 
 
 router = APIRouter(
-    prefix="/sensor",
-    tags=["Sensor"]
+    prefix="/sensors",
+    tags=["Water Sensors"]
 )
 
 
-def get_db():
-    db = SessionLocal()
+# ============================================================
+# CREATE SENSOR READING
+# ============================================================
 
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-@router.post("/readings")
-def receive_sensor_reading(
-    data: SensorReadingSchema,
-    db: Session = Depends(get_db)
+@router.post(
+    "/readings",
+    response_model=SensorReadingResponse
+)
+def create_sensor_reading(
+    data: SensorReadingCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
 ):
+
     reading = SensorReading(
         village_id=data.village_id,
         temperature=data.temperature,
@@ -38,8 +42,85 @@ def receive_sensor_reading(
     db.commit()
     db.refresh(reading)
 
-    return {
-        "status": "success",
-        "message": "Sensor data stored successfully",
-        "reading_id": reading.id
-    }
+    return reading
+
+
+# ============================================================
+# GET ALL READINGS
+# ============================================================
+
+@router.get(
+    "/readings",
+    response_model=list[SensorReadingResponse]
+)
+def get_sensor_readings(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+
+    return (
+        db.query(SensorReading)
+        .order_by(
+            SensorReading.timestamp.desc()
+        )
+        .all()
+    )
+
+
+# ============================================================
+# GET SINGLE READING
+# ============================================================
+
+@router.get(
+    "/readings/{reading_id}",
+    response_model=SensorReadingResponse
+)
+def get_sensor_reading(
+    reading_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+
+    reading = (
+        db.query(SensorReading)
+        .filter(
+            SensorReading.id == reading_id
+        )
+        .first()
+    )
+
+    if not reading:
+        raise HTTPException(
+            status_code=404,
+            detail="Sensor reading not found"
+        )
+
+    return reading
+
+
+# ============================================================
+# GET VILLAGE READINGS
+# ============================================================
+
+@router.get(
+    "/village/{village_id}",
+    response_model=list[SensorReadingResponse]
+)
+def get_village_sensor_readings(
+    village_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+
+    readings = (
+        db.query(SensorReading)
+        .filter(
+            SensorReading.village_id == village_id
+        )
+        .order_by(
+            SensorReading.timestamp.desc()
+        )
+        .all()
+    )
+
+    return readings

@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.database import SessionLocal
+from app.database import get_db
 from app.models.village import Village
 from app.schemas.village import VillageCreate, VillageResponse
+from app.routes.auth import get_current_user
 
 
 router = APIRouter(
@@ -12,65 +13,64 @@ router = APIRouter(
 )
 
 
-def get_db():
-    db = SessionLocal()
+# ============================================================
+# CREATE VILLAGE
+# ============================================================
 
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-@router.post("/", response_model=VillageResponse)
-def register_village(
-    village: VillageCreate,
-    db: Session = Depends(get_db)
+@router.post(
+    "/",
+    response_model=VillageResponse
+)
+def create_village(
+    village_data: VillageCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
 ):
 
-    existing_village = (
-        db.query(Village)
-        .filter(
-            Village.name == village.name,
-            Village.district == village.district
-        )
-        .first()
+    village = Village(
+        name=village_data.name,
+        district=village_data.district,
+        state=village_data.state,
+        population=village_data.population,
+        latitude=village_data.latitude,
+        longitude=village_data.longitude
     )
 
-    if existing_village:
-        raise HTTPException(
-            status_code=400,
-            detail="Village already registered"
-        )
-
-    new_village = Village(
-        name=village.name,
-        district=village.district,
-        state=village.state,
-        latitude=village.latitude,
-        longitude=village.longitude
-    )
-
-    db.add(new_village)
+    db.add(village)
     db.commit()
-    db.refresh(new_village)
+    db.refresh(village)
 
-    return new_village
+    return village
 
 
-@router.get("/", response_model=list[VillageResponse])
+# ============================================================
+# GET ALL VILLAGES
+# ============================================================
+
+@router.get(
+    "/",
+    response_model=list[VillageResponse]
+)
 def get_villages(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
 ):
 
-    villages = db.query(Village).all()
-
-    return villages
+    return db.query(Village).all()
 
 
-@router.get("/{village_id}", response_model=VillageResponse)
+# ============================================================
+# GET ONE VILLAGE
+# ============================================================
+
+@router.get(
+    "/{village_id}",
+    response_model=VillageResponse
+)
 def get_village(
     village_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
 ):
 
     village = (
@@ -86,3 +86,34 @@ def get_village(
         )
 
     return village
+
+
+# ============================================================
+# DELETE VILLAGE
+# ============================================================
+
+@router.delete("/{village_id}")
+def delete_village(
+    village_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+
+    village = (
+        db.query(Village)
+        .filter(Village.id == village_id)
+        .first()
+    )
+
+    if not village:
+        raise HTTPException(
+            status_code=404,
+            detail="Village not found"
+        )
+
+    db.delete(village)
+    db.commit()
+
+    return {
+        "message": "Village deleted successfully"
+    }

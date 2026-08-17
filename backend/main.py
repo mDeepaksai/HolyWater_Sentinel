@@ -1,36 +1,62 @@
 from fastapi import FastAPI
 
-from app.database import Base, engine
+from app.database import engine, Base
 
-from app.models.sensor import SensorReading
-from app.models.village import Village
-
-from app.routes.sensor import router as sensor_router
+from app.routes.auth import router as auth_router
 from app.routes.village import router as village_router
+from app.routes.sensor import router as sensor_router
+from app.routes.simulation import router as simulation_router
 
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# ============================================================
+# CREATE DATABASE TABLES
+# ============================================================
+
+Base.metadata.create_all(
+    bind=engine
+)
 
 
-# Create FastAPI application
+# ============================================================
+# FASTAPI APPLICATION
+# ============================================================
+
 app = FastAPI(
     title="HolyWater Sentinel API",
-    description="Smart Village Water-Health Early Warning System",
+    description=(
+        "Smart Community Health Monitoring and "
+        "Early Warning System for Water-Borne Diseases"
+    ),
     version="1.0.0"
 )
 
 
-# Register API routes
-app.include_router(sensor_router)
+# ============================================================
+# ROUTES
+# ============================================================
+
+app.include_router(auth_router)
+
 app.include_router(village_router)
 
+app.include_router(sensor_router)
 
-# Root endpoint
+app.include_router(simulation_router)
+
+
+# ============================================================
+# ROOT
+# ============================================================
+
 @app.get("/")
 def root():
+
     return {
-        "project": "HolyWater Sentinel",
-        "status": "running",
-        "message": "Water-Health Early Warning API"
+        "message": "HolyWater Sentinel API is running",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "authentication": "/auth",
+        "villages": "/villages",
+        "sensors": "/sensors",
+        "simulation": "/simulation"
     }
