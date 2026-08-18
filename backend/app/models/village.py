@@ -6,38 +6,13 @@ from app.database import Base
 class Village(Base):
     __tablename__ = "villages"
 
-    id = Column(
-        Integer,
-        primary_key=True,
-        index=True
-    )
+    id = Column(Integer, primary_key=True, index=True)
 
-    name = Column(
-        String(100),
-        nullable=False
-    )
+    name = Column(String(100), nullable=False)
+    district = Column(String(100), nullable=False)
+    state = Column(String(100), nullable=False)
 
-    district = Column(
-        String(100),
-        nullable=False
-    )
+    population = Column(Integer, nullable=True)
 
-    state = Column(
-        String(100),
-        nullable=False
-    )
-
-    population = Column(
-        Integer,
-        nullable=True
-    )
-
-    latitude = Column(
-        Float,
-        nullable=True
-    )
-
-    longitude = Column(
-        Float,
-        nullable=True
-    )
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)

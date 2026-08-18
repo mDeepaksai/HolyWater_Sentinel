@@ -1,30 +1,13 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import (
-    sessionmaker,
-    declarative_base
-)
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-from dotenv import load_dotenv
-import os
-
-
-load_dotenv()
-
-
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-
-if not DATABASE_URL:
-    raise ValueError(
-        "DATABASE_URL is not set in .env"
-    )
+from app.config import settings
 
 
 engine = create_engine(
-    DATABASE_URL,
+    settings.database_url,
     echo=True
 )
-
 
 SessionLocal = sessionmaker(
     autocommit=False,
@@ -32,16 +15,13 @@ SessionLocal = sessionmaker(
     bind=engine
 )
 
-
 Base = declarative_base()
 
 
 def get_db():
-
     db = SessionLocal()
 
     try:
         yield db
-
     finally:
         db.close()
