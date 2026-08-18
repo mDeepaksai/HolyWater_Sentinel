@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HolyWater Sentinel — Ops Room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+  :root{
+    --void:#0a0e13;
+    --panel:#10161d;
+    --panel-raised:#161d26;
+    --hairline:#212a35;
+    --text-1:#e7ecf2;
+    --text-2:#8b98a8;
+    --text-3:#55606e;
+    --risk-low:#34d399;
+    --risk-low-dim:#1b3a30;
+    --risk-med:#f2b84b;
+    --risk-med-dim:#3a2f14;
+    --risk-high:#f0563e;
+    --risk-high-dim:#3a1e18;
+    --signal:#52d1dc;
+    --signal-dim:#12333a;
+    --font-display:'Space Grotesk', sans-serif;
+    --font-body:'Inter', sans-serif;
+    --font-mono:'JetBrains Mono', monospace;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:
+      radial-gradient(circle at 12% -10%, rgba(82,209,220,0.06), transparent 40%),
+      radial-gradient(circle at 90% 0%, rgba(240,86,62,0.05), transparent 45%),
+      var(--void);
+    color:var(--text-1);
+    font-family:var(--font-body);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{ background:var(--signal-dim); color:var(--signal); }
+  a{ color:inherit; }
+  button{ font-family:inherit; }
+  :focus-visible{ outline:2px solid var(--signal); outline-offset:2px; }
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:0.001ms !important; transition-duration:0.001ms !important; }
+  }
+
+  /* ---------- utility ---------- */
+  .mono{ font-family:var(--font-mono); }
+  .hidden{ display:none !important; }
+  .risk-dot{ width:8px; height:8px; border-radius:50%; flex:none; }
+  .risk-dot.low{ background:var(--risk-low); box-shadow:0 0 8px rgba(52,211,153,0.6);}
+  .risk-dot.medium{ background:var(--risk-med); box-shadow:0 0 8px rgba(242,184,75,0.6);}
+  .risk-dot.high{ background:var(--risk-high); box-shadow:0 0 8px rgba(240,86,62,0.7);}
+  .badge{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:3px 10px; border-radius:100px;
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase;
+    border:1px solid var(--hairline);
+  }
+  .badge.low{ color:var(--risk-low); background:var(--risk-low-dim); border-color:rgba(52,211,153,0.25); }
+  .badge.medium{ color:var(--risk-med); background:var(--risk-med-dim); border-color:rgba(242,184,75,0.25); }
+  .badge.high{ color:var(--risk-high); background:var(--risk-high-dim); border-color:rgba(240,86,62,0.3); }
+
+  /* ---------- login ---------- */
+  #login-screen{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .login-card{
+    width:100%; max-width:380px;
+    background:var(--panel); border:1px solid var(--hairline); border-radius:14px;
+    padding:36px 32px 30px;
+    position:relative; overflow:hidden;
+  }
+  .login-card::before{
+    content:""; position:absolute; top:0; left:0; right:0; height:2px;
+    background:linear-gradient(90deg, var(--risk-low), var(--risk-med), var(--risk-high));
+  }
+  .brand{ display:flex; align-items:center; gap:10px; margin-bottom:28px; }
+  .brand-mark{
+    width:34px; height:34px; border-radius:9px;
+    background:conic-gradient(from 220deg, var(--risk-low), var(--signal), var(--risk-high), var(--risk-low));
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 0 22px rgba(82,209,220,0.25);
+  }
+  .brand-mark span{ font-family:var(--font-display); font-weight:700; font-size:15px; color:#04121a; }
+  .brand-text h1{ font-family:var(--font-display); font-size:16px; font-weight:600; letter-spacing:.01em; }
+  .brand-text p{ font-family:var(--font-mono); font-size:10px; color:var(--text-3); letter-spacing:.08em; text-transform:uppercase; margin-top:2px;}
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:11px; color:var(--text-2); margin-bottom:6px; letter-spacing:.03em; }
+  .field input{
+    width:100%; background:var(--void); border:1px solid var(--hairline); border-radius:8px;
+    padding:11px 12px; color:var(--text-1); font-size:14px; font-family:var(--font-mono);
+    transition:border-color .15s ease;
+  }
+  .field input:focus{ border-color:var(--signal); }
+  .login-actions{ display:flex; flex-direction:column; gap:10px; margin-top:22px; }
+  .btn{
+    border:none; border-radius:8px; padding:11px 16px; font-size:13px; font-weight:600;
+    cursor:pointer; transition:filter .15s ease, transform .1s ease; letter-spacing:.01em;
+  }
+  .btn:active{ transform:scale(0.98); }
+  .btn-primary{ background:var(--signal); color:#04141a; }
+  .btn-primary:hover{ filter:brightness(1.08); }
+  .btn-ghost{ background:transparent; color:var(--text-2); border:1px solid var(--hairline); }
+  .btn-ghost:hover{ color:var(--text-1); border-color:var(--text-3); }
+  .login-error{
+    margin-top:14px; font-size:12px; color:var(--risk-high); font-family:var(--font-mono);
+    display:none;
+  }
+  .login-error.show{ display:block; }
+  .login-meta{ margin-top:20px; padding-top:16px; border-top:1px solid var(--hairline); font-size:11px; color:var(--text-3); line-height:1.6;}
+
+  /* ---------- app shell ---------- */
+  #app{ min-height:100vh; display:flex; flex-direction:column; }
+  .topbar{
+    height:56px; flex:none; display:flex; align-items:center; gap:20px;
+    padding:0 18px; border-bottom:1px solid var(--hairline); background:rgba(16,22,29,0.7);
+    backdrop-filter:blur(6px); position:sticky; top:0; z-index:40;
+  }
+  .topbar .brand{ margin:0; }
+  .topbar .brand-text h1{ font-size:14px; }
+  .topbar .brand-text p{ font-size:9px; }
+  .topbar-spacer{ flex:1; }
+  .conn{ display:flex; align-items:center; gap:8px; font-family:var(--font-mono); font-size:11px; color:var(--text-2);}
+  .conn-dot{ width:7px; height:7px; border-radius:50%; background:var(--risk-low); animation:pulse-dot 2.2s ease-in-out infinite; }
+  .conn-dot.off{ background:var(--risk-high); animation:none; }
+  @keyframes pulse-dot{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
+  .clock{ font-family:var(--font-mono); font-size:12px; color:var(--text-2); }
+  .mode-toggle{ display:flex; border:1px solid var(--hairline); border-radius:7px; overflow:hidden; }
+  .mode-toggle button{
+    background:transparent; border:none; color:var(--text-3); font-size:11px; font-family:var(--font-mono);
+    padding:6px 10px; cursor:pointer; letter-spacing:.04em;
+  }
+  .mode-toggle button.active{ background:var(--signal-dim); color:var(--signal); }
+  .icon-btn{
+    background:transparent; border:1px solid var(--hairline); color:var(--text-2); border-radius:7px;
+    padding:6px 12px; font-size:11px; cursor:pointer; font-family:var(--font-mono);
+  }
+  .icon-btn:hover{ color:var(--text-1); border-color:var(--text-3); }
+
+  .layout{
+    flex:1; display:grid;
+    grid-template-columns: 250px 1fr 300px;
+    gap:1px; background:var(--hairline);
+    min-height:0;
+  }
+  .pane{ background:var(--void); overflow:hidden; display:flex; flex-direction:column; min-height:0; }
+  .pane-head{
+    padding:14px 16px 10px; flex:none; display:flex; align-items:baseline; justify-content:space-between;
+  }
+  .pane-head h2{ font-family:var(--font-display); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-2); font-weight:600; }
+  .pane-head .count{ font-family:var(--font-mono); font-size:11px; color:var(--text-3); }
+  .pane-body{ flex:1; overflow-y:auto; min-height:0; }
+  .pane-body::-webkit-scrollbar{ width:6px; }
+  .pane-body::-webkit-scrollbar-thumb{ background:var(--hairline); border-radius:3px; }
+
+  /* ranking list */
+  .rank-item{
+    display:flex; align-items:center; gap:10px; padding:11px 16px; cursor:pointer;
+    border-left:2px solid transparent; transition:background .12s ease;
+  }
+  .rank-item:hover{ background:var(--panel); }
+  .rank-item.selected{ background:var(--panel-raised); border-left-color:var(--signal); }
+  .rank-num{ font-family:var(--font-mono); font-size:10px; color:var(--text-3); width:16px; flex:none;}
+  .rank-info{ flex:1; min-width:0; }
+  .rank-info .name{ font-size:13px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rank-info .sub{ font-family:var(--font-mono); font-size:10px; color:var(--text-3); margin-top:2px;}
+  .rank-score{ font-family:var(--font-mono); font-size:13px; font-weight:600; flex:none; }
+  .rank-score.low{ color:var(--risk-low); } .rank-score.medium{ color:var(--risk-med); } .rank-score.high{ color:var(--risk-high); }
+
+  /* center pane: view toggle + map/grid + detail */
+  .center-pane{ display:flex; flex-direction:column; }
+  .view-toggle-row{ display:flex; align-items:center; gap:10px; padding:0 16px 10px; flex:none; }
+  .view-toggle{ display:flex; border:1px solid var(--hairline); border-radius:7px; overflow:hidden; }
+  .view-toggle button{
+    background:transparent; border:none; color:var(--text-3); font-family:var(--font-mono); font-size:11px;
+    padding:6px 12px; cursor:pointer;
+  }
+  .view-toggle button.active{ background:var(--panel-raised); color:var(--text-1); }
+  #overview-strip{ flex:none; height:190px; border-bottom:1px solid var(--hairline); position:relative; }
+  #map-view{ width:100%; height:100%; }
+  #grid-view{ width:100%; height:100%; overflow-x:auto; display:flex; gap:8px; padding:10px 16px; align-items:stretch; }
+  .grid-tile{
+    flex:none; width:120px; border-radius:10px; border:1px solid var(--hairline); background:var(--panel);
+    padding:10px; cursor:pointer; display:flex; flex-direction:column; justify-content:space-between;
+    transition:transform .12s ease, border-color .12s ease;
+  }
+  .grid-tile:hover{ transform:translateY(-2px); }
+  .grid-tile.selected{ border-color:var(--signal); }
+  .grid-tile .name{ font-size:11px; font-weight:500; }
+  .grid-tile .score{ font-family:var(--font-mono); font-size:20px; font-weight:600; margin-top:8px;}
+
+  .detail-scroll{ flex:1; overflow-y:auto; padding:18px 20px 24px; }
+  .detail-empty{ color:var(--text-3); font-family:var(--font-mono); font-size:12px; padding:40px 20px; text-align:center; }
+  .detail-header{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:18px; }
+  .detail-header h3{ font-family:var(--font-display); font-size:20px; font-weight:600; }
+  .detail-header .loc{ font-family:var(--font-mono); font-size:11px; color:var(--text-3); margin-top:3px;}
+
+  .gauge-row{ display:flex; gap:22px; align-items:center; margin-bottom:22px; flex-wrap:wrap; }
+  .gauge-wrap{ position:relative; width:132px; height:132px; flex:none; }
+  .gauge-num{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  }
+  .gauge-num .val{ font-family:var(--font-mono); font-size:26px; font-weight:600; }
+  .gauge-num .lbl{ font-family:var(--font-mono); font-size:9px; color:var(--text-3); text-transform:uppercase; letter-spacing:.08em; margin-top:2px;}
+  .factors{ flex:1; min-width:200px; }
+  .factors h4{ font-size:11px; color:var(--text-2); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; font-weight:600;}
+  .factor-row{ display:flex; align-items:center; gap:8px; font-size:12px; margin-bottom:6px; }
+  .factor-row .fname{ flex:1; color:var(--text-2); }
+  .factor-bar{ width:64px; height:5px; border-radius:3px; background:var(--panel-raised); overflow:hidden; }
+  .factor-bar-fill{ height:100%; background:var(--signal); }
+  .factor-val{ font-family:var(--font-mono); font-size:11px; color:var(--text-3); width:32px; text-align:right;}
+
+  .snapshot-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(110px,1fr)); gap:10px; margin-bottom:22px;}
+  .stat-card{ background:var(--panel); border:1px solid var(--hairline); border-radius:9px; padding:12px; }
+  .stat-card .k{ font-size:10px; color:var(--text-3); text-transform:uppercase; letter-spacing:.06em; }
+  .stat-card .v{ font-family:var(--font-mono); font-size:17px; font-weight:600; margin-top:5px; }
+  .stat-card .u{ font-family:var(--font-mono); font-size:10px; color:var(--text-3); }
+
+  .trend-block h4{ font-size:11px; color:var(--text-2); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px; font-weight:600;}
+  .trend-svg-wrap{ background:var(--panel); border:1px solid var(--hairline); border-radius:9px; padding:14px; }
+
+  /* alerts pane */
+  .alert-item{ padding:12px 16px; border-bottom:1px solid var(--hairline); }
+  .alert-item .top{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:5px;}
+  .alert-item .village{ font-size:12px; font-weight:500; }
+  .alert-item .msg{ font-size:12px; color:var(--text-2); line-height:1.4; }
+  .alert-item .time{ font-family:var(--font-mono); font-size:10px; color:var(--text-3); margin-top:6px; }
+  .alerts-empty{ padding:40px 16px; text-align:center; color:var(--text-3); font-family:var(--font-mono); font-size:12px; }
+
+  .leaflet-container{ background:var(--void) !important; }
+  .village-marker{ border-radius:50%; border:2px solid rgba(0,0,0,0.4); }
+
+  @media (max-width: 980px){
+    .layout{ grid-template-columns:1fr; grid-template-rows:auto auto auto; }
+    .pane{ max-height:340px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="brand">
+      <div class="brand-mark"><span>HW</span></div>
+      <div class="brand-text">
+        <h1>HolyWater Sentinel</h1>
+        <p>Water-Health Early Warning</p>
+      </div>
+    </div>
+    <form id="login-form">
+      <div class="field">
+        <label for="login-user">Username</label>
+        <input id="login-user" type="text" autocomplete="username" placeholder="operator" />
+      </div>
+      <div class="field">
+        <label for="login-pass">Password</label>
+        <input id="login-pass" type="password" autocomplete="current-password" placeholder="••••••••" />
+      </div>
+      <div class="login-actions">
+        <button type="submit" class="btn btn-primary" id="login-submit">Connect to backend</button>
+        <button type="button" class="btn btn-ghost" id="demo-btn">View demo data instead</button>
+      </div>
+      <div class="login-error" id="login-error"></div>
+    </form>
+    <div class="login-meta">
+      Session token is kept in memory only — refreshing the page signs you out. Point CONFIG.API_BASE (top of script) at your FastAPI server before connecting.
+    </div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app" class="hidden">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark"><span>HW</span></div>
+      <div class="brand-text">
+        <h1>HolyWater Sentinel</h1>
+        <p>Ops Room</p>
+      </div>
+    </div>
+    <div class="topbar-spacer"></div>
+    <div class="clock" id="clock">--:--:--</div>
+    <div class="conn"><span class="conn-dot" id="conn-dot"></span><span id="conn-label">connecting</span></div>
+    <div class="mode-toggle">
+      <button id="mode-demo" class="mono">DEMO</button>
+      <button id="mode-live" class="mono">LIVE</button>
+    </div>
+    <button class="icon-btn" id="refresh-btn">↻ Refresh</button>
+    <button class="icon-btn" id="logout-btn">Sign out</button>
+  </div>
+
+  <div class="layout">
+    <!-- RISK RANKING -->
+    <div class="pane" id="pane-ranking">
+      <div class="pane-head">
+        <h2>Risk Ranking</h2>
+        <span class="count" id="ranking-count">0 villages</span>
+      </div>
+      <div class="pane-body" id="ranking-list"></div>
+    </div>
+
+    <!-- MAP / GRID + DETAIL -->
+    <div class="pane center-pane">
+      <div class="view-toggle-row">
+        <div class="view-toggle">
+          <button id="view-map" class="mono active">Map</button>
+          <button id="view-grid" class="mono">Grid</button>
+        </div>
+        <span class="count" id="overview-hint">interactive village-risk overview</span>
+      </div>
+      <div id="overview-strip">
+        <div id="map-view"></div>
+        <div id="grid-view" class="hidden"></div>
+      </div>
+      <div class="detail-scroll" id="detail-scroll">
+        <div class="detail-empty">Select a village from the ranking list, grid, or map to see risk factors, live sensor data, and trends.</div>
+      </div>
+    </div>
+
+    <!-- ALERTS -->
+    <div class="pane" id="pane-alerts">
+      <div class="pane-head">
+        <h2>Live Alerts</h2>
+        <span class="count" id="alerts-count">0 active</span>
+      </div>
+      <div class="pane-body" id="alerts-list"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* =====================================================================
+   CONFIG — adjust this block to match your actual FastAPI routes.
+   Nothing else in the file should need to change once these line up.
+   ===================================================================== */
+const CONFIG = {
+  API_BASE: "http://localhost:8000",
+  ENDPOINTS: {
+    login:        () => `/auth/login`,                       // tried as JSON, falls back to OAuth2 form POST /auth/token
+    villages:     () => `/villages/`,
+    village:      (id) => `/villages/${id}`,
+    sensorLatest: (id) => `/sensors/village/${id}/latest`,
+    weather:      (id) => `/weather/village/${id}`,
+    health:       (id) => `/health/village/${id}`,
+    riskHistory:  (id) => `/risk/village/${id}`,
+    riskPredict:  (id) => `/risk/predict/${id}`,
+    alertCheck:   (id) => `/alerts/check/${id}`,
+    alertsAll:    () => `/alerts/`,
+  },
+  POLL_MS: 15000,          // how often LIVE mode refreshes
+  RISK_LOW_MAX: 34,        // score thresholds used only for demo-data generation / gauge color bands
+  RISK_MED_MAX: 69,
+};
+
+/* =====================================================================
+   STATE
+   ===================================================================== */
+const state = {
+  mode: "demo",           // 'demo' | 'live'
+  token: null,
+  view: "map",             // 'map' | 'grid'
+  villages: [],             // normalized: {id,name,population,lat,lng,risk_level,risk_score,factors,updated_at}
+  sensorById: {},
+  weatherById: {},
+  healthById: {},
+  trendById: {},           // id -> [{t, score}]
+  alerts: [],
+  selectedId: null,
+  pollTimer: null,
+  connected: false,
+};
+
+/* =====================================================================
+   NORMALIZERS — tolerant of a few common FastAPI field-naming styles.
+   Edit these if your schema uses something else entirely.
+   ===================================================================== */
+function pick(obj, keys, fallback){
+  for(const k of keys){ if(obj && obj[k] !== undefined && obj[k] !== null) return obj[k]; }
+  return fallback;
+}
+function riskTier(score){
+  if(score === null || score === undefined) return "low";
+  if(score <= CONFIG.RISK_LOW_MAX) return "low";
+  if(score <= CONFIG.RISK_MED_MAX) return "medium";
+  return "high";
+}
+function normalizeVillage(raw, riskInfo){
+  const id = pick(raw, ["id","village_id"], null);
+  const score = riskInfo ? pick(riskInfo, ["risk_score","score","probability","risk_probability"], 0) : pick(raw, ["risk_score"], 0);
+  const level = riskInfo ? pick(riskInfo, ["risk_level","riskLevel","level"], null) : pick(raw, ["risk_level"], null);
+  return {
+    id,
+    name: pick(raw, ["name","village_name"], `Village ${id}`),
+    population: pick(raw, ["population","pop"], null),
+    lat: pick(raw, ["latitude","lat"], null),
+    lng: pick(raw, ["longitude","lng","lon"], null),
+    risk_score: typeof score === "number" ? Math.round(score <= 1 ? score*100 : score) : 0,
+    risk_level: (level || riskTier(score)).toString().toLowerCase(),
+    factors: riskInfo ? pick(riskInfo, ["contributing_factors","factors","shap_values","explanation"], []) : [],
+    updated_at: riskInfo ? pick(riskInfo, ["created_at","timestamp","updated_at"], null) : null,
+  };
+}
+function normalizeSensor(raw){
+  if(!raw) return null;
+  return {
+    temperature: pick(raw, ["temperature","temp"], null),
+    ph: pick(raw, ["ph","pH"], null),
+    turbidity: pick(raw, ["turbidity"], null),
+    tds: pick(raw, ["tds","TDS"], null),
+    timestamp: pick(raw, ["timestamp","created_at"], null),
+  };
+}
+function normalizeWeather(raw){
+  if(!raw) return null;
+  return {
+    rainfall: pick(raw, ["rainfall","precipitation"], null),
+    temperature: pick(raw, ["temperature","temp"], null),
+    humidity: pick(raw, ["humidity"], null),
+  };
+}
+function normalizeHealth(raw){
+  if(!raw) return null;
+  return {
+    case_count: pick(raw, ["case_count","cases"], null),
+    disease: pick(raw, ["disease","disease_type"], null),
+  };
+}
+function normalizeAlert(raw, villageName){
+  return {
+    id: pick(raw, ["id","alert_id"], Math.random().toString(36).slice(2)),
+    village_id: pick(raw, ["village_id"], null),
+    village_name: pick(raw, ["village_name"], villageName || "Unknown village"),
+    level: (pick(raw, ["risk_level","level","severity"], "medium")).toString().toLowerCase(),
+    message: pick(raw, ["message","reason","detail"], "Risk threshold change detected."),
+    time: pick(raw, ["created_at","timestamp"], new Date().toISOString()),
+  };
+}
+
+/* =====================================================================
+   API LAYER
+   ===================================================================== */
+async function apiFetch(path, opts={}){
+  const headers = Object.assign({ "Content-Type":"application/json" }, opts.headers || {});
+  if(state.token) headers["Authorization"] = `Bearer ${state.token}`;
+  const res = await fetch(CONFIG.API_BASE + path, Object.assign({}, opts, { headers }));
+  if(!res.ok){ throw new Error(`${opts.method||"GET"} ${path} → ${res.status}`); }
+  const ct = res.headers.get("content-type") || "";
+  return ct.includes("application/json") ? res.json() : res.text();
+}
+
+async function login(username, password){
+  // Try a plain JSON login first.
+  try{
+    const data = await apiFetch(CONFIG.ENDPOINTS.login(), {
+      method:"POST",
+      body: JSON.stringify({ username, password }),
+    });
+    return pick(data, ["access_token","token"], null);
+  }catch(e){ /* fall through to OAuth2 form style */ }
+
+  // Fallback: FastAPI's default OAuth2PasswordRequestForm expects form-encoded data.
+  const form = new URLSearchParams();
+  form.set("username", username);
+  form.set("password", password);
+  const res = await fetch(CONFIG.API_BASE + "/auth/token", {
+    method:"POST",
+    headers:{ "Content-Type":"application/x-www-form-urlencoded" },
+    body: form.toString(),
+  });
+  if(!res.ok) throw new Error("login failed");
+  const data = await res.json();
+  return pick(data, ["access_token","token"], null);
+}
+
+async function loadAll(){
+  const rawVillages = await apiFetch(CONFIG.ENDPOINTS.villages());
+  const list = Array.isArray(rawVillages) ? rawVillages : pick(rawVillages, ["items","villages"], []);
+
+  const villages = [];
+  for(const rv of list){
+    const id = pick(rv, ["id","village_id"], null);
+    if(id === null) continue;
+    let riskInfo = null;
+    try{ riskInfo = await apiFetch(CONFIG.ENDPOINTS.riskPredict(id), { method:"POST" }); }
+    catch(e){
+      try{
+        const hist = await apiFetch(CONFIG.ENDPOINTS.riskHistory(id));
+        const arr = Array.isArray(hist) ? hist : pick(hist, ["items","history"], []);
+        riskInfo = arr[arr.length-1] || null;
+      }catch(e2){ riskInfo = null; }
+    }
+    villages.push(normalizeVillage(rv, riskInfo));
+
+    try{
+      const hist = await apiFetch(CONFIG.ENDPOINTS.riskHistory(id));
+      const arr = Array.isArray(hist) ? hist : pick(hist, ["items","history"], []);
+      state.trendById[id] = arr.slice(-14).map(r => ({
+        t: pick(r, ["created_at","timestamp"], ""),
+        score: (() => { const s = pick(r, ["risk_score","score","probability"], 0); return s<=1? Math.round(s*100): Math.round(s); })(),
+      }));
+    }catch(e){ /* leave existing trend if any */ }
+
+    try{ state.sensorById[id] = normalizeSensor(await apiFetch(CONFIG.ENDPOINTS.sensorLatest(id))); }catch(e){ /* noop */ }
+    try{ state.weatherById[id] = normalizeWeather(await apiFetch(CONFIG.ENDPOINTS.weather(id))); }catch(e){ /* noop */ }
+    try{ state.healthById[id] = normalizeHealth(await apiFetch(CONFIG.ENDPOINTS.health(id))); }catch(e){ /* noop */ }
+  }
+  state.villages = villages;
+
+  let alerts = [];
+  try{
+    const rawAlerts = await apiFetch(CONFIG.ENDPOINTS.alertsAll());
+    const arr = Array.isArray(rawAlerts) ? rawAlerts : pick(rawAlerts, ["items","alerts"], []);
+    alerts = arr.map(a => normalizeAlert(a, (villages.find(v=>v.id===pick(a,["village_id"],null))||{}).name));
+  }catch(e){
+    for(const v of villages){
+      if(v.risk_level !== "low"){
+        try{
+          const a = await apiFetch(CONFIG.ENDPOINTS.alertCheck(v.id), { method:"POST" });
+          if(a) alerts.push(normalizeAlert(Object.assign({village_id:v.id}, a), v.name));
+        }catch(e2){ /* noop */ }
+      }
+    }
+  }
+  state.alerts = alerts;
+}
+
+/* =====================================================================
+   DEMO DATA — lets the dashboard render fully with no backend running.
+   ===================================================================== */
+const DEMO_VILLAGES_RAW = [
+  { id:1, name:"Rampur Kalan",   population:1840, latitude:26.912, longitude:80.912, base:78 },
+  { id:2, name:"Sundarpur",       population:2210, latitude:26.845, longitude:80.842, base:24 },
+  { id:3, name:"Chandpur Basti",  population:960,  latitude:26.960, longitude:81.010, base:55 },
+  { id:4, name:"Devgarh",         population:3140, latitude:26.780, longitude:80.760, base:12 },
+  { id:5, name:"Ratanpur Khurd",  population:1420, latitude:26.870, longitude:80.980, base:66 },
+  { id:6, name:"Kishanganj",      population:2670, latitude:26.995, longitude:80.870, base:38 },
+  { id:7, name:"Maheshpur",       population:1105, latitude:26.820, longitude:81.050, base:8  },
+  { id:8, name:"Barwa Sagar",     population:1980, latitude:26.900, longitude:81.100, base:47 },
+];
+function jitter(n, amt){ return Math.max(0, Math.min(100, Math.round(n + (Math.random()*2-1)*amt))); }
+function buildDemoWorld(){
+  const villages = DEMO_VILLAGES_RAW.map(v => {
+    const score = jitter(v.base, 6);
+    const factorsPool = [
+      {name:"Turbidity", weight: 20 + Math.random()*60},
+      {name:"pH deviation", weight: 10 + Math.random()*50},
+      {name:"TDS level", weight: 15 + Math.random()*55},
+      {name:"Rainfall (7d)", weight: 10 + Math.random()*45},
+      {name:"Reported illness", weight: 5 + Math.random()*60},
+    ].sort((a,b)=>b.weight-a.weight).slice(0,4);
+    return normalizeVillage(
+      { id:v.id, name:v.name, population:v.population, latitude:v.latitude, longitude:v.longitude },
+      { risk_score:score, contributing_factors: factorsPool, created_at:new Date().toISOString() }
+    );
+  });
+
+  const sensorById={}, weatherById={}, healthById={}, trendById={};
+  for(const v of villages){
+    sensorById[v.id] = { temperature:(24+Math.random()*8).toFixed(1), ph:(6.4+Math.random()*1.8).toFixed(2), turbidity:(1+Math.random()*9).toFixed(1), tds:(150+Math.random()*450).toFixed(0), timestamp:new Date().toISOString() };
+    weatherById[v.id] = { rainfall:(Math.random()*40).toFixed(1), temperature:(28+Math.random()*6).toFixed(1), humidity:(45+Math.random()*40).toFixed(0) };
+    healthById[v.id] = { case_count: Math.round(v.risk_score/8 + Math.random()*3), disease:"Acute diarrheal disease" };
+    const hist=[]; let s=v.risk_score;
+    for(let i=13;i>=0;i--){ s=jitter(s,5); hist.push({ t:`Day -${i}`, score:s }); }
+    hist[hist.length-1].score = v.risk_score;
+    trendById[v.id]=hist;
+  }
+  const alerts=[];
+  for(const v of villages){
+    if(v.risk_level !== "low"){
+      alerts.push(normalizeAlert({
+        village_id:v.id,
+        risk_level:v.risk_level,
+        message: v.risk_level==="high"
+          ? "Model + sensor thresholds agree: elevated contamination risk. Recommend water testing within 24h."
+          : "Risk trending upward over last 3 readings — monitor closely.",
+        created_at:new Date(Date.now()-Math.random()*3600e3*6).toISOString(),
+      }, v.name));
+    }
+  }
+  alerts.sort((a,b)=> new Date(b.time)-new Date(a.time));
+  return { villages, sensorById, weatherById, healthById, trendById, alerts };
+}
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+function riskColor(tier){ return tier==="low" ? "var(--risk-low)" : tier==="medium" ? "var(--risk-med)" : "var(--risk-high)"; }
+function riskColorHex(tier){ return tier==="low" ? "#34d399" : tier==="medium" ? "#f2b84b" : "#f0563e"; }
+
+function renderClock(){
+  document.getElementById("clock").textContent = new Date().toLocaleTimeString("en-GB");
+}
+
+function renderConn(){
+  const dot = document.getElementById("conn-dot");
+  const label = document.getElementById("conn-label");
+  dot.classList.toggle("off", !state.connected && state.mode==="live");
+  label.textContent = state.mode==="demo" ? "demo data" : (state.connected ? "live" : "unreachable");
+  document.getElementById("mode-demo").classList.toggle("active", state.mode==="demo");
+  document.getElementById("mode-live").classList.toggle("active", state.mode==="live");
+}
+
+function renderRanking(){
+  const list = document.getElementById("ranking-list");
+  const sorted = [...state.villages].sort((a,b)=>b.risk_score-a.risk_score);
+  document.getElementById("ranking-count").textContent = `${sorted.length} villages`;
+  list.innerHTML = sorted.map((v,i)=>`
+    <div class="rank-item ${v.id===state.selectedId?'selected':''}" data-id="${v.id}">
+      <span class="rank-num mono">${String(i+1).padStart(2,'0')}</span>
+      <span class="risk-dot ${v.risk_level}"></span>
+      <div class="rank-info">
+        <div class="name">${v.name}</div>
+        <div class="sub">${v.population ? v.population.toLocaleString()+' people' : 'pop. n/a'}</div>
+      </div>
+      <div class="rank-score ${v.risk_level}">${v.risk_score}</div>
+    </div>`).join("");
+  list.querySelectorAll(".rank-item").forEach(el=>{
+    el.addEventListener("click", ()=> selectVillage(Number(el.dataset.id)));
+  });
+}
+
+function renderAlerts(){
+  const list = document.getElementById("alerts-list");
+  document.getElementById("alerts-count").textContent = `${state.alerts.length} active`;
+  if(!state.alerts.length){
+    list.innerHTML = `<div class="alerts-empty">No active alerts.<br/>All monitored villages are within normal risk bands.</div>`;
+    return;
+  }
+  list.innerHTML = state.alerts.map(a=>`
+    <div class="alert-item" data-id="${a.village_id}">
+      <div class="top">
+        <span class="village">${a.village_name}</span>
+        <span class="badge ${a.level}">${a.level}</span>
+      </div>
+      <div class="msg">${a.message}</div>
+      <div class="time mono">${timeAgo(a.time)}</div>
+    </div>`).join("");
+  list.querySelectorAll(".alert-item").forEach(el=>{
+    el.addEventListener("click", ()=>{ if(el.dataset.id!=="null") selectVillage(Number(el.dataset.id)); });
+  });
+}
+
+function timeAgo(iso){
+  if(!iso) return "—";
+  const diff = Math.max(0, Date.now() - new Date(iso).getTime());
+  const m = Math.floor(diff/60000);
+  if(m<1) return "just now";
+  if(m<60) return `${m}m ago`;
+  const h = Math.floor(m/60);
+  if(h<24) return `${h}h ago`;
+  return `${Math.floor(h/24)}d ago`;
+}
+
+function renderGrid(){
+  const grid = document.getElementById("grid-view");
+  grid.innerHTML = state.villages.map(v=>`
+    <div class="grid-tile ${v.id===state.selectedId?'selected':''}" data-id="${v.id}" style="border-left:3px solid ${riskColorHex(v.risk_level)}">
+      <div class="name">${v.name}</div>
+      <div class="score mono" style="color:${riskColorHex(v.risk_level)}">${v.risk_score}</div>
+    </div>`).join("");
+  grid.querySelectorAll(".grid-tile").forEach(el=>{
+    el.addEventListener("click", ()=> selectVillage(Number(el.dataset.id)));
+  });
+}
+
+let leafletMap = null, leafletMarkers = {};
+function renderMap(){
+  const withCoords = state.villages.filter(v=>v.lat!=null && v.lng!=null);
+  if(!withCoords.length){
+    document.getElementById("view-grid").click();
+    document.getElementById("view-map").style.opacity = 0.4;
+    document.getElementById("view-map").disabled = true;
+    return;
+  }
+  if(!leafletMap){
+    leafletMap = L.map("map-view", { zoomControl:false, attributionControl:false }).setView([withCoords[0].lat, withCoords[0].lng], 11);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { maxZoom:18 }).addTo(leafletMap);
+  }
+  for(const id in leafletMarkers){ leafletMap.removeLayer(leafletMarkers[id]); }
+  leafletMarkers = {};
+  const bounds = [];
+  withCoords.forEach(v=>{
+    const marker = L.circleMarker([v.lat, v.lng], {
+      radius: v.id===state.selectedId ? 11 : 8,
+      color: riskColorHex(v.risk_level),
+      fillColor: riskColorHex(v.risk_level),
+      fillOpacity: 0.75,
+      weight: v.id===state.selectedId ? 3 : 1,
+      className:"village-marker",
+    }).addTo(leafletMap);
+    marker.bindTooltip(`${v.name} · ${v.risk_score}`, { direction:"top", offset:[0,-6] });
+    marker.on("click", ()=> selectVillage(v.id));
+    leafletMarkers[v.id]=marker;
+    bounds.push([v.lat, v.lng]);
+  });
+  if(bounds.length>1) leafletMap.fitBounds(bounds, { padding:[20,20] });
+  setTimeout(()=>leafletMap && leafletMap.invalidateSize(), 50);
+}
+
+function svgGauge(score, tier){
+  const r=52, c=2*Math.PI*r, pct=Math.max(0,Math.min(100,score))/100;
+  return `
+  <svg viewBox="0 0 132 132" width="132" height="132">
+    <circle cx="66" cy="66" r="${r}" fill="none" stroke="var(--panel-raised)" stroke-width="10"/>
+    <circle cx="66" cy="66" r="${r}" fill="none" stroke="${riskColorHex(tier)}" stroke-width="10"
+      stroke-dasharray="${c}" stroke-dashoffset="${c*(1-pct)}" stroke-linecap="round"
+      transform="rotate(-90 66 66)" style="transition:stroke-dashoffset .6s ease"/>
+  </svg>`;
+}
+
+function svgTrend(points, tier){
+  if(!points || !points.length) return `<div style="color:var(--text-3); font-size:11px;">No trend history yet.</div>`;
+  const w=460, h=90, pad=8;
+  const max=Math.max(100, ...points.map(p=>p.score)), min=0;
+  const step = points.length>1 ? (w-pad*2)/(points.length-1) : 0;
+  const coords = points.map((p,i)=>{
+    const x = pad + i*step;
+    const y = pad + (1-(p.score-min)/(max-min||1))*(h-pad*2);
+    return [x,y];
+  });
+  const path = coords.map((c,i)=> (i===0?"M":"L")+c[0].toFixed(1)+","+c[1].toFixed(1)).join(" ");
+  const area = path + ` L${coords[coords.length-1][0].toFixed(1)},${h-pad} L${coords[0][0].toFixed(1)},${h-pad} Z`;
+  const last = coords[coords.length-1];
+  return `
+  <svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${riskColorHex(tier)}" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="${riskColorHex(tier)}" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path d="${area}" fill="url(#trendFill)" />
+    <path d="${path}" fill="none" stroke="${riskColorHex(tier)}" stroke-width="2"/>
+    <circle cx="${last[0]}" cy="${last[1]}" r="3.5" fill="${riskColorHex(tier)}"/>
+  </svg>`;
+}
+
+function renderDetail(){
+  const el = document.getElementById("detail-scroll");
+  const v = state.villages.find(x=>x.id===state.selectedId);
+  if(!v){ el.innerHTML = `<div class="detail-empty">Select a village from the ranking list, grid, or map to see risk factors, live sensor data, and trends.</div>`; return; }
+
+  const sensor = state.sensorById[v.id] || {};
+  const weather = state.weatherById[v.id] || {};
+  const health = state.healthById[v.id] || {};
+  const trend = state.trendById[v.id] || [];
+  const maxFactor = Math.max(1, ...(v.factors||[]).map(f=>pick(f,["weight","value","importance"],0)));
+
+  el.innerHTML = `
+    <div class="detail-header">
+      <div>
+        <h3>${v.name}</h3>
+        <div class="loc mono">${v.lat!=null ? v.lat.toFixed(3)+', '+v.lng.toFixed(3) : 'coordinates n/a'} · pop. ${v.population ? v.population.toLocaleString() : 'n/a'}</div>
+      </div>
+      <span class="badge ${v.risk_level}">${v.risk_level} risk</span>
+    </div>
+
+    <div class="gauge-row">
+      <div class="gauge-wrap">
+        ${svgGauge(v.risk_score, v.risk_level)}
+        <div class="gauge-num">
+          <div class="val" style="color:${riskColorHex(v.risk_level)}">${v.risk_score}</div>
+          <div class="lbl">risk score</div>
+        </div>
+      </div>
+      <div class="factors">
+        <h4>Contributing Factors</h4>
+        ${(v.factors && v.factors.length) ? v.factors.map(f=>{
+          const name = pick(f,["name","factor","feature"], "factor");
+          const val = pick(f,["weight","value","importance"], 0);
+          const pct = Math.round((val/maxFactor)*100);
+          return `<div class="factor-row">
+            <span class="fname">${name}</span>
+            <div class="factor-bar"><div class="factor-bar-fill" style="width:${pct}%"></div></div>
+            <span class="factor-val mono">${typeof val==="number" ? val.toFixed(1) : val}</span>
+          </div>`;
+        }).join("") : `<div style="color:var(--text-3); font-size:12px;">No explanation payload returned for this prediction.</div>`}
+      </div>
+    </div>
+
+    <div class="snapshot-grid">
+      <div class="stat-card"><div class="k">Temperature</div><div class="v">${sensor.temperature ?? '—'}<span class="u"> °C</span></div></div>
+      <div class="stat-card"><div class="k">pH</div><div class="v">${sensor.ph ?? '—'}</div></div>
+      <div class="stat-card"><div class="k">Turbidity</div><div class="v">${sensor.turbidity ?? '—'}<span class="u"> NTU</span></div></div>
+      <div class="stat-card"><div class="k">TDS</div><div class="v">${sensor.tds ?? '—'}<span class="u"> ppm</span></div></div>
+      <div class="stat-card"><div class="k">Rainfall (7d)</div><div class="v">${weather.rainfall ?? '—'}<span class="u"> mm</span></div></div>
+      <div class="stat-card"><div class="k">Reported cases</div><div class="v">${health.case_count ?? '—'}</div></div>
+    </div>
+
+    <div class="trend-block">
+      <h4>Risk Trend</h4>
+      <div class="trend-svg-wrap">${svgTrend(trend, v.risk_level)}</div>
+    </div>
+  `;
+}
+
+function renderAll(){
+  renderRanking();
+  renderAlerts();
+  if(state.view==="grid") renderGrid(); else renderMap();
+  renderDetail();
+}
+
+function selectVillage(id){
+  state.selectedId = id;
+  renderAll();
+}
+
+/* =====================================================================
+   CONTROLLERS
+   ===================================================================== */
+function switchView(view){
+  state.view = view;
+  document.getElementById("view-map").classList.toggle("active", view==="map");
+  document.getElementById("view-grid").classList.toggle("active", view==="grid");
+  document.getElementById("map-view").classList.toggle("hidden", view!=="map");
+  document.getElementById("grid-view").classList.toggle("hidden", view!=="grid");
+  if(view==="map") renderMap(); else renderGrid();
+}
+
+async function refreshLive(){
+  try{
+    await loadAll();
+    state.connected = true;
+  }catch(e){
+    state.connected = false;
+    console.error("[HolyWater Sentinel] refresh failed:", e.message);
+  }
+  renderAll();
+  renderConn();
+}
+
+function startPolling(){
+  clearInterval(state.pollTimer);
+  if(state.mode==="live"){
+    state.pollTimer = setInterval(refreshLive, CONFIG.POLL_MS);
+  }
+}
+
+function enterApp(){
+  document.getElementById("login-screen").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+  renderConn();
+  renderAll();
+  startPolling();
+}
+
+function loadDemo(){
+  const world = buildDemoWorld();
+  Object.assign(state, {
+    mode:"demo", connected:true,
+    villages: world.villages,
+    sensorById: world.sensorById,
+    weatherById: world.weatherById,
+    healthById: world.healthById,
+    trendById: world.trendById,
+    alerts: world.alerts,
+    selectedId: world.villages[0].id,
+  });
+  enterApp();
+}
+
+/* =====================================================================
+   EVENTS
+   ===================================================================== */
+document.getElementById("demo-btn").addEventListener("click", loadDemo);
+
+document.getElementById("login-form").addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  const errEl = document.getElementById("login-error");
+  errEl.classList.remove("show");
+  const user = document.getElementById("login-user").value.trim();
+  const pass = document.getElementById("login-pass").value;
+  const btn = document.getElementById("login-submit");
+  btn.disabled = true; btn.textContent = "Connecting…";
+  try{
+    const token = await login(user, pass);
+    if(!token) throw new Error("No access_token in response");
+    state.token = token;
+    state.mode = "live";
+    await loadAll();
+    state.connected = true;
+    state.selectedId = state.villages[0] ? state.villages[0].id : null;
+    enterApp();
+  }catch(err){
+    errEl.textContent = `Couldn't reach backend at ${CONFIG.API_BASE} (${err.message}). Check CONFIG.API_BASE and your route names, or try demo data.`;
+    errEl.classList.add("show");
+  }finally{
+    btn.disabled = false; btn.textContent = "Connect to backend";
+  }
+});
+
+document.getElementById("view-map").addEventListener("click", ()=>switchView("map"));
+document.getElementById("view-grid").addEventListener("click", ()=>switchView("grid"));
+document.getElementById("mode-demo").addEventListener("click", ()=>{ if(state.mode!=="demo"){ loadDemo(); } });
+document.getElementById("mode-live").addEventListener("click", async ()=>{
+  if(state.mode!=="live"){ state.mode="live"; renderConn(); await refreshLive(); startPolling(); }
+});
+document.getElementById("refresh-btn").addEventListener("click", ()=>{ if(state.mode==="live") refreshLive(); else loadDemo(); });
+document.getElementById("logout-btn").addEventListener("click", ()=>{
+  clearInterval(state.pollTimer);
+  state.token = null;
+  document.getElementById("app").classList.add("hidden");
+  document.getElementById("login-screen").classList.remove("hidden");
+  document.getElementById("login-pass").value = "";
+});
+
+setInterval(renderClock, 1000);
+renderClock();
+
+})();
+</script>
+</body>
+</html>
