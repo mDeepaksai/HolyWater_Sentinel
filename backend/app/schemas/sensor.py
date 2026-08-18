@@ -38,7 +38,9 @@ class SensorReadingResponse(BaseModel):
     ph: float
     turbidity: float
     tds: float
-    timestamp: datetime
+    latitude: float | None = None
+    longitude: float | None = None
+    recorded_at: datetime
 
     class Config:
         from_attributes = True

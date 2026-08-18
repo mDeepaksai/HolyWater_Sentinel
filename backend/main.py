@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
 
@@ -25,6 +26,8 @@ from app.routes.sensor import router as sensor_router
 from app.routes.simulation import router as simulation_router
 from app.routes.weather import router as weather_router
 from app.routes.health import router as health_router
+from app.routes.risk import router as risk_router
+from app.routes.alert import router as alert_router
 
 # ============================================================
 # CREATE DATABASE TABLES
@@ -46,6 +49,21 @@ app = FastAPI(
 )
 
 # ============================================================
+# CORS — allows the frontend dashboard (opened as a local file
+# or served from a different origin) to call this API.
+# Tighten allow_origins to your actual frontend URL before any
+# public/production deployment.
+# ============================================================
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ============================================================
 # REGISTER ROUTES
 # ============================================================
 
@@ -55,6 +73,8 @@ app.include_router(sensor_router)
 app.include_router(simulation_router)
 app.include_router(weather_router)
 app.include_router(health_router)
+app.include_router(risk_router)
+app.include_router(alert_router)
 
 # ============================================================
 # ROOT ENDPOINT
@@ -71,5 +91,7 @@ def root():
         "sensors": "/sensors",
         "simulation": "/simulation",
         "weather": "/weather",
-        "health": "/health"
+        "health": "/health",
+        "risk": "/risk",
+        "alerts": "/alerts"
     }

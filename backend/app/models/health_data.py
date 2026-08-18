@@ -10,10 +10,16 @@ class HealthData(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    village_id = Column(Integer, nullable=False, index=True)
+    village_id = Column(Integer, nullable=True, index=True)  # made optional
+
+    district = Column(
+        String(100),
+        nullable=False,
+        index=True
+    )
 
     disease_name = Column(
-        String(150),
+        String(255),
         nullable=False
     )
 
